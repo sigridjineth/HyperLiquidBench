@@ -168,9 +168,12 @@ impl PerpOrder {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum PerpTif {
+    #[serde(alias = "Alo", alias = "alo")]
     Alo,
     #[default]
+    #[serde(alias = "Gtc", alias = "gtc")]
     Gtc,
+    #[serde(alias = "Ioc", alias = "ioc")]
     Ioc,
 }
 

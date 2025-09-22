@@ -6,9 +6,13 @@
 
 HyperLiquidBench is a reproducible benchmark for measuring the **operational
 competence** of Hyperliquid trading agents. It leans on the same “declare
-metrics → execute → evaluate” philosophy used in SuiBench: prove an agent can
+metrics → execute → evaluate” philosophy used in [SolanaBench](https://solana.com/news/solana-bench): prove an agent can
 route venue actions correctly, not just print PnL. The toolchain is Rust-first,
 ships deterministic datasets, and records every effect so results are auditable.
+
+* Product Deck: https://drive.google.com/file/d/1tnQpgina5jGGIV9QXQrfPQ96FWUwsiz6/view?usp=sharing
+* Demo Frontend: https://hyperliquid-bench.vercel.app/
+* YouTube Link: https://youtu.be/m8pSPQIDdxQ
 
 ---
 
@@ -66,7 +70,7 @@ requests via an Ethereum private key.
 
 1. **Clone and fetch dependencies**
    ```bash
-   git clone https://github.com/your-org/hyperliquidbench.git
+   git clone https://github.com/sigridjineth/hyperliquidbench.git
    cd hyperliquidbench
    cargo fetch
    ```

@@ -442,6 +442,8 @@ async fn run_demo(
         }
     }
 
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
     Ok(())
 }
 

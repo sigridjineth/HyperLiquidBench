@@ -1,4 +1,4 @@
-# HyperLiquidBench
+# HyperliquidBench
 
 ![logo.png](assets/logo.png)
 ![frontend.png](assets/frontend.png)

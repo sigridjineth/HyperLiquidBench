@@ -1,5 +1,9 @@
 # HyperLiquidBench
 
+![logo.png](assets/logo.png)
+![frontend.png](assets/frontend.png)
+![leaderboard.png](assets/leaderboard.png)
+
 HyperLiquidBench is a reproducible benchmark for measuring the **operational
 competence** of Hyperliquid trading agents. It leans on the same “declare
 metrics → execute → evaluate” philosophy used in SuiBench: prove an agent can

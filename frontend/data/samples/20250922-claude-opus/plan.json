@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "perp_orders": {
+        "builderCode": "claude-opus",
+        "orders": [
+          {
+            "coin": "ETH",
+            "tif": "Gtc",
+            "side": "buy",
+            "sz": 0.012,
+            "reduceOnly": false,
+            "px": "mid-0.4%",
+            "cloid": "51f675f3-0f3c-4f17-8b98-5eab5a7ef2cc",
+            "trigger": { "kind": "none" }
+          }
+        ]
+      }
+    },
+    { "cancel_all": { "coin": "ETH" } },
+    { "usd_class_transfer": { "toPerp": false, "usdc": 12.5 } }
+  ]
+}

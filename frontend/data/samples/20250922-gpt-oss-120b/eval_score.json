@@ -1,0 +1,43 @@
+{
+  "finalScore": 3.25,
+  "base": 3.0,
+  "bonus": 0.25,
+  "penalty": 0.0,
+  "perDomain": [
+    {
+      "name": "perp",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "perp.order.GTC:false:none"
+      ],
+      "uniqueCount": 1,
+      "contribution": 1.0
+    },
+    {
+      "name": "account",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "account.usdClassTransfer.toPerp"
+      ],
+      "uniqueCount": 1,
+      "contribution": 1.0
+    },
+    {
+      "name": "risk",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "risk.setLeverage.BTC"
+      ],
+      "uniqueCount": 1,
+      "contribution": 1.0
+    }
+  ],
+  "uniqueSignatures": [
+    "account.usdClassTransfer.toPerp",
+    "perp.order.GTC:false:none",
+    "risk.setLeverage.BTC"
+  ],
+  "capPerSignature": 3,
+  "windowMs": 200,
+  "unmappedSignatures": []
+}

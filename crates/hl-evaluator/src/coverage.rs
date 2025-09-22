@@ -31,7 +31,7 @@ pub struct CoverageArgs {
     /// Path to domains-hl.yaml configuration
     #[arg(long)]
     domains: PathBuf,
-    /// Output directory (defaults to parent directory of input file)
+    /// Output directory (defaults to parent directory of file input)
     #[arg(long)]
     out_dir: Option<PathBuf>,
     /// Override window size in milliseconds for composition bonus

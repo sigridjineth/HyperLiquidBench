@@ -1,0 +1,3 @@
+{"stepIdx":0,"action":"perp_orders","submitTsMs":1728009122055,"windowKeyMs":1728009122000,"signatures":["perp.order.GTC:false:none"],"ignored":false,"reason":null}
+{"stepIdx":1,"action":"cancel_all","submitTsMs":1728009122288,"windowKeyMs":1728009122200,"signatures":["perp.cancel.all"],"ignored":false,"reason":null}
+{"stepIdx":2,"action":"usd_class_transfer","submitTsMs":1728009122360,"windowKeyMs":1728009122200,"signatures":["account.usdClassTransfer.fromPerp"],"ignored":false,"reason":null}

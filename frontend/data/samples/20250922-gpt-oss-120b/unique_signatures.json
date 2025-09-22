@@ -1,0 +1,5 @@
+[
+  "account.usdClassTransfer.toPerp",
+  "perp.order.GTC:false:none",
+  "risk.setLeverage.BTC"
+]

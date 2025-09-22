@@ -1,0 +1,33 @@
+{
+  "network": "testnet",
+  "builderCode": "gpt-oss-120b",
+  "plan": {
+    "steps": [
+      {
+        "perp_orders": {
+          "builderCode": "gpt-oss-120b",
+          "orders": [
+            {
+              "coin": "BTC",
+              "side": "buy",
+              "sz": 0.005,
+              "tif": "GTC",
+              "reduceOnly": false,
+              "px": "mid-0.7%",
+              "resolvedPx": 61210.55,
+              "cloid": "c3e4a918-b4ac-4d35-8d8d-9f330b35430c",
+              "trigger": { "kind": "none" }
+            }
+          ]
+        }
+      },
+      { "set_leverage": { "coin": "BTC", "leverage": 7, "cross": true } },
+      { "usd_class_transfer": { "toPerp": true, "usdc": 18.0 } }
+    ]
+  },
+  "wallet": "0x4b8d9cc9b09f1a4f36eb50b17be69f42c621c0d9",
+  "outDir": "runs/20250922-gpt-oss-120b",
+  "effectTimeoutMs": 2000,
+  "timestamp": "20250922-13:25:19",
+  "windowMs": 200
+}

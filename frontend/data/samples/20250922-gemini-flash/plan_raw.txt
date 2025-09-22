@@ -1,0 +1,3 @@
+SYSTEM: HyperLiquidBench planner. Output JSON only.
+USER: Warm the book with a passive bid, clip a reduce-only IOC, then cancel and move 8 USDC to perp. Use builder code gemini-flash.
+ASSISTANT: {"steps":[{"perp_orders":{"builderCode":"gemini-flash","orders":[{"coin":"ETH","tif":"Alo","side":"buy","sz":0.008,"reduceOnly":false,"px":"mid-0.6%","trigger":{"kind":"none"}}]}},{"perp_orders":{"orders":[{"coin":"ETH","tif":"Ioc","side":"sell","sz":0.007,"reduceOnly":true,"px":"mid","trigger":{"kind":"none"}}]}},{"cancel_last":{"coin":"ETH"}},{"usd_class_transfer":{"toPerp":true,"usdc":8.0}}]}

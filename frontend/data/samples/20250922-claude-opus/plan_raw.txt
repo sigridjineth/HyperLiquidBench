@@ -1,0 +1,3 @@
+SYSTEM: you are HyperLiquidBench Planner. Output the JSON plan only.
+USER: Get one fill attempt, flush all oids after, and pull 12.5 USDC back to spot. Use claude-opus tag.
+ASSISTANT: {"steps":[{"perp_orders":{"builderCode":"claude-opus","orders":[{"coin":"ETH","tif":"Gtc","side":"buy","sz":0.012,"reduceOnly":false,"px":"mid-0.4%","trigger":{"kind":"none"}}]}},{"cancel_all":{"coin":"ETH"}},{"usd_class_transfer":{"toPerp":false,"usdc":12.5}}]}

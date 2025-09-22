@@ -1,0 +1,4 @@
+SYSTEM: You are HyperLiquidBench Planner. Reply with strict JSON under 200 tokens.
+USER: Plan a safe coverage sweep on ETH perp: warm up, cancel, move 25 USDC to perp, set leverage 10x cross. Use builder code gpt5-high.
+ASSISTANT:
+{ "steps": [ { "perp_orders": { "builderCode": "gpt5-high", "orders": [ { "coin": "ETH", "tif": "Alo", "side": "buy", "sz": 0.01, "reduceOnly": false, "px": "mid-0.8%", "trigger": { "kind": "none" } }, { "coin": "ETH", "tif": "Gtc", "side": "sell", "sz": 0.009, "reduceOnly": false, "px": "mid+0.9%", "trigger": { "kind": "none" } } ] } }, { "sleep_ms": { "duration_ms": 80 } }, { "cancel_last": { "coin": "ETH" } }, { "usd_class_transfer": { "toPerp": true, "usdc": 25.0 } }, { "set_leverage": { "coin": "ETH", "leverage": 10, "cross": false } } ] }

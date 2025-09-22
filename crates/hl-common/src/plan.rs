@@ -135,6 +135,7 @@ pub struct SetLeverageStep {
 #[serde(rename_all = "camelCase")]
 pub struct SleepMsStep {
     #[serde(alias = "ms")]
+    #[serde(alias = "duration_ms")]
     pub duration_ms: u64,
 }
 

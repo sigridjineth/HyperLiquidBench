@@ -1,0 +1,33 @@
+{
+  "network": "testnet",
+  "builderCode": "claude-opus",
+  "plan": {
+    "steps": [
+      {
+        "perp_orders": {
+          "builderCode": "claude-opus",
+          "orders": [
+            {
+              "coin": "ETH",
+              "side": "buy",
+              "sz": 0.012,
+              "tif": "GTC",
+              "reduceOnly": false,
+              "px": "mid-0.4%",
+              "resolvedPx": 3498.18,
+              "cloid": "51f675f3-0f3c-4f17-8b98-5eab5a7ef2cc",
+              "trigger": { "kind": "none" }
+            }
+          ]
+        }
+      },
+      { "cancel_all": { "coin": "ETH" } },
+      { "usd_class_transfer": { "toPerp": false, "usdc": 12.5 } }
+    ]
+  },
+  "wallet": "0x6a47d8986bb512f0c7af5c3be7c4d0b129a5f2ce",
+  "outDir": "runs/20250922-claude-opus",
+  "effectTimeoutMs": 2000,
+  "timestamp": "20250922-13:58:10",
+  "windowMs": 200
+}

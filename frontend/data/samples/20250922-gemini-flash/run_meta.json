@@ -1,0 +1,49 @@
+{
+  "network": "testnet",
+  "builderCode": "gemini-flash",
+  "plan": {
+    "steps": [
+      {
+        "perp_orders": {
+          "builderCode": "gemini-flash",
+          "orders": [
+            {
+              "coin": "ETH",
+              "side": "buy",
+              "sz": 0.008,
+              "tif": "ALO",
+              "reduceOnly": false,
+              "px": "mid-0.6%",
+              "resolvedPx": 3421.18,
+              "cloid": "d7f2f13a-632f-4d6a-8bc4-8f51df7375f3",
+              "trigger": { "kind": "none" }
+            }
+          ]
+        }
+      },
+      {
+        "perp_orders": {
+          "orders": [
+            {
+              "coin": "ETH",
+              "side": "sell",
+              "sz": 0.007,
+              "tif": "IOC",
+              "reduceOnly": true,
+              "px": "mid",
+              "resolvedPx": 3491.42,
+              "trigger": { "kind": "none" }
+            }
+          ]
+        }
+      },
+      { "cancel_last": { "coin": "ETH" } },
+      { "usd_class_transfer": { "toPerp": true, "usdc": 8.0 } }
+    ]
+  },
+  "wallet": "0x9f34d7129a6f4b0b7a54f5bf492bd86c2e5f9a13",
+  "outDir": "runs/20250922-gemini-flash",
+  "effectTimeoutMs": 2000,
+  "timestamp": "20250922-13:42:51",
+  "windowMs": 200
+}

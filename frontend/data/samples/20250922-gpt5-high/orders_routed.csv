@@ -1,0 +1,3 @@
+ts,oid,coin,side,px,sz,tif,reduceOnly,builderCode
+1728006101123,984512345,ETH,buy,3512.42,0.01,ALO,false,gpt5-high
+1728006101123,984512346,ETH,sell,3580.67,0.009,GTC,false,gpt5-high

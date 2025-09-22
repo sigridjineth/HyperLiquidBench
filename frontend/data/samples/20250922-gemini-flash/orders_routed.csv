@@ -1,0 +1,3 @@
+ts,oid,coin,side,px,sz,tif,reduceOnly,builderCode
+1769125203121,992301112,ETH,buy,3421.18,0.008,ALO,false,gemini-flash
+1769125203248,992301115,ETH,sell,3491.42,0.007,IOC,true,gemini-flash

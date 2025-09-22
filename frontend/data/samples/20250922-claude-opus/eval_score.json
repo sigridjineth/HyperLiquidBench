@@ -1,0 +1,35 @@
+{
+  "finalScore": 3.25,
+  "base": 3.0,
+  "bonus": 0.25,
+  "penalty": 0.0,
+  "perDomain": [
+    {
+      "name": "perp",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "perp.order.GTC:false:none",
+        "perp.cancel.all"
+      ],
+      "uniqueCount": 2,
+      "contribution": 2.0
+    },
+    {
+      "name": "account",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "account.usdClassTransfer.fromPerp"
+      ],
+      "uniqueCount": 1,
+      "contribution": 1.0
+    }
+  ],
+  "uniqueSignatures": [
+    "account.usdClassTransfer.fromPerp",
+    "perp.cancel.all",
+    "perp.order.GTC:false:none"
+  ],
+  "capPerSignature": 3,
+  "windowMs": 200,
+  "unmappedSignatures": []
+}

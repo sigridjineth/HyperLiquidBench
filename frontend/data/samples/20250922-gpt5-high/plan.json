@@ -1,0 +1,35 @@
+{
+  "steps": [
+    {
+      "perp_orders": {
+        "builderCode": "gpt5-high",
+        "orders": [
+          {
+            "coin": "ETH",
+            "tif": "Alo",
+            "side": "buy",
+            "sz": 0.01,
+            "reduceOnly": false,
+            "px": "mid-0.8%",
+            "cloid": "8a7691d0-9da3-4f3b-8cb1-0bda2fe21a23",
+            "trigger": { "kind": "none" }
+          },
+          {
+            "coin": "ETH",
+            "tif": "Gtc",
+            "side": "sell",
+            "sz": 0.009,
+            "reduceOnly": false,
+            "px": "mid+0.9%",
+            "cloid": "f2e61d9b-b7f0-4d5a-8ee8-5f9e3ff45c11",
+            "trigger": { "kind": "none" }
+          }
+        ]
+      }
+    },
+    { "sleep_ms": { "duration_ms": 80 } },
+    { "cancel_last": { "coin": "ETH" } },
+    { "usd_class_transfer": { "toPerp": true, "usdc": 25.0 } },
+    { "set_leverage": { "coin": "ETH", "leverage": 10, "cross": false } }
+  ]
+}

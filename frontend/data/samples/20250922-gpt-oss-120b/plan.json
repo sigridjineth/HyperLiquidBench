@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "perp_orders": {
+        "builderCode": "gpt-oss-120b",
+        "orders": [
+          {
+            "coin": "BTC",
+            "tif": "Gtc",
+            "side": "buy",
+            "sz": 0.005,
+            "reduceOnly": false,
+            "px": "mid-0.7%",
+            "cloid": "c3e4a918-b4ac-4d35-8d8d-9f330b35430c",
+            "trigger": { "kind": "none" }
+          }
+        ]
+      }
+    },
+    { "set_leverage": { "coin": "BTC", "leverage": 7, "cross": true } },
+    { "usd_class_transfer": { "toPerp": true, "usdc": 18.0 } }
+  ]
+}

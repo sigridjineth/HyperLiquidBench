@@ -1,0 +1,5 @@
+[
+  "account.usdClassTransfer.fromPerp",
+  "perp.cancel.all",
+  "perp.order.GTC:false:none"
+]

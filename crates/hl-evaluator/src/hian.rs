@@ -448,6 +448,7 @@ impl PxMatcher {
 
 #[derive(Debug, Clone)]
 struct TransferEvent {
+    to_perp: bool,
     usdc: Option<f64>,
     time_ms: Option<i64>,
 }
@@ -501,6 +502,13 @@ fn match_transfer(
     let Some(event) = event else {
         return Err("no observed transfer event".to_string());
     };
+
+    if event.to_perp != expected.to_perp {
+        return Err(format!(
+            "toPerp mismatch in observed event (expected {}, got {})",
+            expected.to_perp, event.to_perp
+        ));
+    }
 
     if let Some(matcher) = &expected.usdc {
         let amount = event
@@ -731,13 +739,18 @@ fn extract_transfer_event(action: &ActionLogRecord) -> Option<TransferEvent> {
     for obs in observations {
         let channel = obs.get("channel").and_then(Value::as_str).unwrap_or("");
         if channel == "accountClassTransfer" {
+            let to_perp = obs.get("toPerp").and_then(Value::as_bool)?;
             let usdc = obs.get("usdc").and_then(Value::as_f64).or_else(|| {
                 obs.get("usdc")
                     .and_then(Value::as_str)
                     .and_then(|s| s.parse::<f64>().ok())
             });
             let time_ms = obs.get("time").and_then(Value::as_i64);
-            return Some(TransferEvent { usdc, time_ms });
+            return Some(TransferEvent {
+                to_perp,
+                usdc,
+                time_ms,
+            });
         }
     }
     None
@@ -768,7 +781,11 @@ fn find_transfer_in_ws(action: &ActionLogRecord, ws_events: &[WsEvent]) -> Optio
                 .and_then(Value::as_bool)
                 .unwrap_or(to_perp);
             if to_perp == expected_to_perp {
-                return Some(TransferEvent { usdc, time_ms });
+                return Some(TransferEvent {
+                    to_perp,
+                    usdc,
+                    time_ms,
+                });
             }
         }
     }

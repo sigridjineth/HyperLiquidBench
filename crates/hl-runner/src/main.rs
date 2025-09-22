@@ -1,6 +1,9 @@
+mod llm;
+
 use std::{
     collections::{HashMap, VecDeque},
-    path::PathBuf,
+    env,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
     time::Duration,
@@ -24,7 +27,8 @@ use hyperliquid_rust_sdk::{
     ExchangeClient, ExchangeDataStatus, ExchangeResponseStatus, InfoClient, LedgerUpdate,
     LedgerUpdateData, Message, Subscription,
 };
-use serde_json::json;
+use llm::{generate_plan as llm_generate_plan, parse_allowed_coins, LlmOptions, LlmPlanSpec};
+use serde_json::{json, Value};
 use tokio::{
     sync::{broadcast, mpsc, Mutex},
     time::timeout,
@@ -57,11 +61,43 @@ struct Cli {
 
     /// Hex-encoded private key for the trading wallet (env: HL_PRIVATE_KEY)
     #[arg(long, env = "HL_PRIVATE_KEY")]
-    private_key: String,
+    private_key: Option<String>,
+
+    /// Run entirely locally without hitting Hyperliquid APIs
+    #[arg(long, default_value_t = false)]
+    demo: bool,
 
     /// Max time (ms) to wait for websocket confirmation effects
     #[arg(long, default_value_t = 2_000)]
     effect_timeout_ms: u64,
+
+    /// LLM model to use when plan spec is llm:*
+    #[arg(long, env = "LLM_MODEL")]
+    llm_model: Option<String>,
+
+    /// Maximum steps to request from the LLM
+    #[arg(long, env = "LLM_MAX_STEPS", default_value_t = 5)]
+    llm_max_steps: u32,
+
+    /// Comma-separated list of coins allowed in LLM plans
+    #[arg(long)]
+    llm_allowed_coins: Option<String>,
+
+    /// Default builder code suggested to the LLM
+    #[arg(long)]
+    llm_builder_code: Option<String>,
+
+    /// Sampling temperature for the LLM
+    #[arg(long, env = "LLM_TEMPERATURE", default_value_t = 0.2)]
+    llm_temperature: f32,
+
+    /// top-p value for the LLM
+    #[arg(long, env = "LLM_TOP_P", default_value_t = 1.0)]
+    llm_top_p: f32,
+
+    /// Maximum output tokens for the LLM response
+    #[arg(long, env = "LLM_MAX_OUTPUT_TOKENS", default_value_t = 800)]
+    llm_max_output_tokens: u32,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -138,7 +174,16 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = Cli::parse();
-    let plan = load_plan_from_spec(&cli.plan)?;
+    let base_url = cli.network.base_url();
+
+    let plan_source = resolve_plan(&cli, base_url).await?;
+    let PlanSource {
+        plan,
+        raw,
+        llm_meta,
+        dry_run,
+    } = plan_source;
+
     let timestamp = Utc::now().format("%Y%m%d-%H%M%S").to_string();
     let out_dir = cli
         .out
@@ -146,59 +191,679 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| PathBuf::from("runs").join(&timestamp));
 
     let plan_json = plan.as_json();
-    let artifacts = RunArtifacts::create(&out_dir, &plan_json, None, None)?;
+    let artifacts = RunArtifacts::create(&out_dir, &plan_json, raw.as_deref(), None)?;
     let artifacts = Arc::new(Mutex::new(artifacts));
 
-    let wallet = LocalWallet::from_str(cli.private_key.trim())
-        .map_err(|e| anyhow!("failed to parse wallet private key: {e}"))?;
-    let wallet_address = wallet.address();
+    if dry_run {
+        let window_ms = artifacts.lock().await.window_ms();
+        let meta = build_run_meta(
+            &cli,
+            &timestamp,
+            &out_dir,
+            &plan_json,
+            None,
+            window_ms,
+            llm_meta.as_ref(),
+            true,
+            cli.demo,
+        )?;
+        artifacts.lock().await.write_meta(&meta)?;
+        info!(
+            "HL_LLM_DRYRUN=1, generated plan but skipped execution. Artifacts under {}",
+            out_dir.display()
+        );
+        return Ok(());
+    }
 
-    let base_url = cli.network.base_url();
+    let mut wallet_hex: Option<String> = None;
 
-    let exchange = ExchangeClient::new(None, wallet.clone(), Some(base_url), None, None)
-        .await
-        .context("failed to initialise exchange client")?;
+    if cli.demo {
+        info!("demo mode enabled — skipping network execution");
+        run_demo(plan.clone(), artifacts.clone(), cli.builder_code.clone()).await?;
+    } else {
+        let private_key = cli.private_key.as_ref().ok_or_else(|| {
+            anyhow!("--private-key or HL_PRIVATE_KEY must be provided unless --demo is set")
+        })?;
 
-    let info_http = InfoClient::new(None, Some(base_url))
-        .await
-        .context("failed to initialise info client")?;
-    let info_ws = InfoClient::with_reconnect(None, Some(base_url))
-        .await
-        .context("failed to initialise websocket info client")?;
+        let wallet = LocalWallet::from_str(private_key.trim())
+            .map_err(|e| anyhow!("failed to parse wallet private key: {e}"))?;
+        let wallet_address = wallet.address();
+        wallet_hex = Some(format!("0x{:x}", wallet_address));
 
-    let (event_tx, _) = broadcast::channel::<ObservedEvent>(256);
-    spawn_ws_task(info_ws, wallet_address, artifacts.clone(), event_tx.clone());
+        let exchange = ExchangeClient::new(None, wallet.clone(), Some(base_url), None, None)
+            .await
+            .context("failed to initialise exchange client")?;
 
-    execute_plan(
-        plan,
-        artifacts.clone(),
-        exchange,
-        info_http,
-        event_tx.clone(),
-        cli.builder_code.clone(),
-        cli.effect_timeout_ms,
-    )
-    .await?;
+        let info_http = InfoClient::new(None, Some(base_url))
+            .await
+            .context("failed to initialise info client")?;
+        let info_ws = InfoClient::with_reconnect(None, Some(base_url))
+            .await
+            .context("failed to initialise websocket info client")?;
 
-    let window_ms = {
-        let artifacts = artifacts.lock().await;
-        artifacts.window_ms()
-    };
+        let (event_tx, _) = broadcast::channel::<ObservedEvent>(256);
+        spawn_ws_task(info_ws, wallet_address, artifacts.clone(), event_tx.clone());
 
-    let meta = json!({
-        "network": cli.network.as_str(),
-        "builderCode": cli.builder_code,
-        "plan": { "steps": plan_json["steps"].clone() },
-        "wallet": format!("0x{:x}", wallet_address),
-        "outDir": out_dir.display().to_string(),
-        "effectTimeoutMs": cli.effect_timeout_ms,
-        "timestamp": timestamp,
-        "windowMs": window_ms,
-    });
+        execute_plan(
+            plan,
+            artifacts.clone(),
+            exchange,
+            info_http,
+            event_tx.clone(),
+            cli.builder_code.clone(),
+            cli.effect_timeout_ms,
+        )
+        .await?;
+    }
+
+    let window_ms = artifacts.lock().await.window_ms();
+    let meta = build_run_meta(
+        &cli,
+        &timestamp,
+        &out_dir,
+        &plan_json,
+        wallet_hex,
+        window_ms,
+        llm_meta.as_ref(),
+        false,
+        cli.demo,
+    )?;
     artifacts.lock().await.write_meta(&meta)?;
 
     info!("run artifacts stored under {}", out_dir.display());
     Ok(())
+}
+
+struct PlanSource {
+    plan: Plan,
+    raw: Option<String>,
+    llm_meta: Option<llm::LlmMeta>,
+    dry_run: bool,
+}
+
+async fn resolve_plan(cli: &Cli, base_url: BaseUrl) -> Result<PlanSource> {
+    if let Some(spec) = LlmPlanSpec::parse(&cli.plan) {
+        let allowed_coins = determine_allowed_coins(cli, base_url).await?;
+        let llm_opts = build_llm_options(cli, allowed_coins)?;
+        let llm_plan = llm_generate_plan(spec, &llm_opts).await?;
+        Ok(PlanSource {
+            plan: llm_plan.plan,
+            raw: Some(llm_plan.raw),
+            llm_meta: Some(llm_plan.meta),
+            dry_run: llm_opts.dry_run,
+        })
+    } else {
+        let plan = load_plan_from_spec(&cli.plan)?;
+        Ok(PlanSource {
+            plan,
+            raw: None,
+            llm_meta: None,
+            dry_run: false,
+        })
+    }
+}
+
+async fn determine_allowed_coins(cli: &Cli, base_url: BaseUrl) -> Result<Vec<String>> {
+    if let Some(ref csv) = cli.llm_allowed_coins {
+        let coins = parse_allowed_coins(csv);
+        if coins.is_empty() {
+            return Err(anyhow!("--llm-allowed-coins did not contain any symbols"));
+        }
+        Ok(coins)
+    } else {
+        fetch_allowed_coins_from_network(base_url).await
+    }
+}
+
+async fn fetch_allowed_coins_from_network(base_url: BaseUrl) -> Result<Vec<String>> {
+    let info = InfoClient::new(None, Some(base_url))
+        .await
+        .context("failed to initialise info client for coin discovery")?;
+    let meta = info
+        .meta()
+        .await
+        .context("failed to fetch meta for coin discovery")?;
+    let mut coins = meta
+        .universe
+        .into_iter()
+        .map(|asset| asset.name)
+        .filter(|name| !name.is_empty())
+        .take(5)
+        .collect::<Vec<_>>();
+    if coins.is_empty() {
+        coins.push("ETH".to_string());
+    }
+    Ok(coins)
+}
+
+fn build_llm_options(cli: &Cli, allowed_coins: Vec<String>) -> Result<LlmOptions> {
+    if allowed_coins.is_empty() {
+        return Err(anyhow!("allowed coin list is empty"));
+    }
+
+    let model = cli
+        .llm_model
+        .clone()
+        .or_else(|| env::var("LLM_MODEL").ok())
+        .ok_or_else(|| anyhow!("--llm-model or LLM_MODEL must be provided for llm:* plans"))?;
+    let api_key = env::var("OPENROUTER_API_KEY")
+        .map_err(|_| anyhow!("OPENROUTER_API_KEY must be set for llm:* plans"))?;
+
+    Ok(LlmOptions {
+        api_key,
+        model,
+        temperature: cli.llm_temperature,
+        top_p: cli.llm_top_p,
+        max_output_tokens: cli.llm_max_output_tokens,
+        max_steps: cli.llm_max_steps.max(1),
+        allowed_coins,
+        default_builder_code: cli
+            .llm_builder_code
+            .clone()
+            .or_else(|| cli.builder_code.clone()),
+        cache_dir: llm::discover_cache_dir(),
+        dry_run: llm::dry_run_enabled(),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_run_meta(
+    cli: &Cli,
+    timestamp: &str,
+    out_dir: &Path,
+    plan_json: &Value,
+    wallet: Option<String>,
+    window_ms: i64,
+    llm_meta: Option<&llm::LlmMeta>,
+    dry_run: bool,
+    demo: bool,
+) -> Result<Value> {
+    let network_label = if demo { "demo" } else { cli.network.as_str() };
+    let mut meta = json!({
+        "network": network_label,
+        "builderCode": cli.builder_code,
+        "plan": { "steps": plan_json["steps"].clone() },
+        "wallet": wallet,
+        "outDir": out_dir.display().to_string(),
+        "effectTimeoutMs": cli.effect_timeout_ms,
+        "timestamp": timestamp,
+        "windowMs": window_ms,
+        "llmDryRun": dry_run,
+        "demoMode": demo,
+    });
+
+    if let Some(meta_obj) = llm_meta {
+        meta["llm"] = serde_json::to_value(meta_obj)?;
+    }
+
+    Ok(meta)
+}
+
+async fn run_demo(
+    plan: Plan,
+    artifacts: Arc<Mutex<RunArtifacts>>,
+    default_builder_code: Option<String>,
+) -> Result<()> {
+    let default_builder = default_builder_code.as_deref();
+    let mut placed_orders: VecDeque<PlacedOrder> = VecDeque::new();
+    let mut next_oid: u64 = 1;
+
+    for (idx, step) in plan.steps.iter().enumerate() {
+        match step {
+            ActionStep::PerpOrders { perp_orders } => {
+                run_demo_perp_orders(
+                    idx,
+                    perp_orders,
+                    &artifacts,
+                    default_builder,
+                    &mut placed_orders,
+                    &mut next_oid,
+                )
+                .await?;
+            }
+            ActionStep::CancelLast { cancel_last } => {
+                run_demo_cancel_last(idx, cancel_last, &artifacts, &mut placed_orders).await?;
+            }
+            ActionStep::CancelOids { cancel_oids } => {
+                run_demo_cancel_oids(idx, cancel_oids, &artifacts, &mut placed_orders).await?;
+            }
+            ActionStep::CancelAll { cancel_all } => {
+                run_demo_cancel_all(idx, cancel_all, &artifacts, &mut placed_orders).await?;
+            }
+            ActionStep::UsdClassTransfer { usd_class_transfer } => {
+                run_demo_usd_transfer(idx, usd_class_transfer, &artifacts).await?;
+            }
+            ActionStep::SetLeverage { set_leverage } => {
+                run_demo_set_leverage(idx, set_leverage, &artifacts).await?;
+            }
+            ActionStep::Sleep { .. } => {
+                // Skip real sleeping in demo mode to keep runs fast.
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_demo_perp_orders(
+    step_idx: usize,
+    step: &PerpOrdersStep,
+    artifacts: &Arc<Mutex<RunArtifacts>>,
+    default_builder: Option<&str>,
+    placed_orders: &mut VecDeque<PlacedOrder>,
+    next_oid: &mut u64,
+) -> Result<()> {
+    if step.orders.is_empty() {
+        return Ok(());
+    }
+
+    let submit_ts = timestamp_ms();
+    let builder_code = step
+        .builder_code
+        .clone()
+        .or_else(|| default_builder.map(|code| code.to_string()));
+
+    let mut statuses = Vec::new();
+    let mut observed = Vec::new();
+    let mut request_orders = Vec::new();
+    let mut routed = Vec::new();
+
+    for order in &step.orders {
+        if order.trigger.is_some() {
+            return Err(anyhow!("demo mode does not yet support triggered orders"));
+        }
+        let mid = demo_mid_for_coin(&order.coin);
+        let resolved_px = order.px.resolve_with_mid(mid);
+        let oid = *next_oid;
+        *next_oid += 1;
+        placed_orders.push_back(PlacedOrder {
+            coin: order.coin.clone(),
+            oid,
+        });
+
+        statuses.push(json!({ "kind": "success", "oid": oid }));
+        observed.push(json!({
+            "channel": "orderUpdates",
+            "oid": oid,
+            "coin": order.coin,
+            "status": "open",
+            "demo": true
+        }));
+
+        let mut order_value = json!({
+            "coin": order.coin,
+            "side": if order.is_buy() { "buy" } else { "sell" },
+            "sz": order.sz,
+            "tif": order.tif.as_sdk_str(),
+            "reduceOnly": order.reduce_only,
+            "px": order_price_label(&order.px),
+            "resolvedPx": resolved_px,
+            "trigger": "none",
+        });
+        if let Some(code) = &order.builder_code {
+            order_value["builderCode"] = json!(code);
+        }
+        request_orders.push(order_value);
+
+        let routed_builder = order.builder_code.clone().or_else(|| builder_code.clone());
+        routed.push(RoutedOrderRecord {
+            ts_ms: submit_ts,
+            oid: Some(oid),
+            coin: order.coin.clone(),
+            side: if order.is_buy() {
+                "buy".to_string()
+            } else {
+                "sell".to_string()
+            },
+            px: resolved_px,
+            sz: order.sz,
+            tif: order.tif.as_sdk_str().to_string(),
+            reduce_only: order.reduce_only,
+            builder_code: routed_builder,
+        });
+    }
+
+    let ack_value = json!({
+        "status": "ok",
+        "data": { "statuses": statuses },
+    });
+    let observed_value = if observed.is_empty() {
+        None
+    } else {
+        Some(Value::Array(observed.clone()))
+    };
+
+    let mut request_value = json!({
+        "perp_orders": { "orders": request_orders },
+    });
+    if let Some(code) = &builder_code {
+        request_value["perp_orders"]["builderCode"] = json!(code);
+    }
+
+    {
+        let mut artifacts = artifacts.lock().await;
+        let record = artifacts.make_action_record(
+            step_idx,
+            "perp_orders",
+            submit_ts,
+            request_value,
+            Some(ack_value),
+            observed_value.clone(),
+            Some("demo mode synthetic execution".to_string()),
+        );
+        artifacts.log_action(&record)?;
+        for event in &observed {
+            artifacts.log_ws_event(event)?;
+        }
+        for routed_record in routed {
+            artifacts.log_routed_order(&routed_record)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_demo_cancel_last(
+    step_idx: usize,
+    step: &CancelLastStep,
+    artifacts: &Arc<Mutex<RunArtifacts>>,
+    placed_orders: &mut VecDeque<PlacedOrder>,
+) -> Result<()> {
+    let submit_ts = timestamp_ms();
+    let removed = if let Some(coin) = &step.coin {
+        let mut removed = None;
+        for idx in (0..placed_orders.len()).rev() {
+            if let Some(order) = placed_orders.get(idx) {
+                if &order.coin == coin {
+                    removed = placed_orders.remove(idx);
+                    break;
+                }
+            }
+        }
+        removed
+    } else {
+        placed_orders.pop_back()
+    };
+
+    let (ack_value, observed, notes) = if let Some(order) = removed {
+        let observed = json!({
+            "channel": "orderUpdates",
+            "oid": order.oid,
+            "status": "canceled",
+            "demo": true
+        });
+        (
+            json!({ "status": "ok", "data": { "oid": order.oid } }),
+            Some(observed),
+            None,
+        )
+    } else {
+        (
+            json!({ "status": "ok", "data": { "note": "no resting order" } }),
+            None,
+            Some("demo: no resting order to cancel".to_string()),
+        )
+    };
+
+    let mut request_value = json!({ "cancel_last": {} });
+    if let Some(coin) = &step.coin {
+        request_value["cancel_last"]["coin"] = json!(coin);
+    }
+
+    {
+        let mut artifacts = artifacts.lock().await;
+        let record = artifacts.make_action_record(
+            step_idx,
+            "cancel_last",
+            submit_ts,
+            request_value,
+            Some(ack_value),
+            observed.clone(),
+            notes.clone(),
+        );
+        artifacts.log_action(&record)?;
+        if let Some(event) = observed {
+            artifacts.log_ws_event(&event)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_demo_cancel_oids(
+    step_idx: usize,
+    step: &CancelOidsStep,
+    artifacts: &Arc<Mutex<RunArtifacts>>,
+    placed_orders: &mut VecDeque<PlacedOrder>,
+) -> Result<()> {
+    let submit_ts = timestamp_ms();
+    let mut statuses = Vec::new();
+    let mut observed = Vec::new();
+
+    for oid in &step.oids {
+        let mut removed = None;
+        for idx in 0..placed_orders.len() {
+            if let Some(order) = placed_orders.get(idx) {
+                if order.oid == *oid {
+                    removed = placed_orders.remove(idx);
+                    break;
+                }
+            }
+        }
+        if let Some(order) = removed {
+            statuses.push(json!({ "kind": "success", "oid": order.oid }));
+            observed.push(json!({
+                "channel": "orderUpdates",
+                "oid": order.oid,
+                "status": "canceled",
+                "demo": true
+            }));
+        } else {
+            statuses.push(json!({ "kind": "missing", "oid": oid }));
+        }
+    }
+
+    let ack_value = json!({
+        "status": "ok",
+        "data": { "statuses": statuses },
+    });
+
+    let observed_value = if observed.is_empty() {
+        None
+    } else {
+        Some(Value::Array(observed.clone()))
+    };
+
+    let request_value = json!({
+        "cancel_oids": {
+            "coin": step.coin,
+            "oids": step.oids,
+        }
+    });
+
+    {
+        let mut artifacts = artifacts.lock().await;
+        let record = artifacts.make_action_record(
+            step_idx,
+            "cancel_oids",
+            submit_ts,
+            request_value,
+            Some(ack_value),
+            observed_value.clone(),
+            Some("demo mode synthetic execution".to_string()),
+        );
+        artifacts.log_action(&record)?;
+        for event in &observed {
+            artifacts.log_ws_event(event)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_demo_cancel_all(
+    step_idx: usize,
+    step: &CancelAllStep,
+    artifacts: &Arc<Mutex<RunArtifacts>>,
+    placed_orders: &mut VecDeque<PlacedOrder>,
+) -> Result<()> {
+    let submit_ts = timestamp_ms();
+    let mut removed_oids = Vec::new();
+
+    if let Some(coin) = &step.coin {
+        let mut remaining = VecDeque::new();
+        while let Some(order) = placed_orders.pop_front() {
+            if &order.coin == coin {
+                removed_oids.push(order.oid);
+            } else {
+                remaining.push_back(order);
+            }
+        }
+        *placed_orders = remaining;
+    } else {
+        while let Some(order) = placed_orders.pop_front() {
+            removed_oids.push(order.oid);
+        }
+    }
+
+    let ack_value = json!({
+        "status": "ok",
+        "data": { "canceledOids": removed_oids },
+    });
+    let observed = if removed_oids.is_empty() {
+        None
+    } else {
+        Some(Value::Array(
+            removed_oids
+                .iter()
+                .map(|oid| {
+                    json!({
+                        "channel": "orderUpdates",
+                        "oid": oid,
+                        "status": "canceled",
+                        "demo": true
+                    })
+                })
+                .collect(),
+        ))
+    };
+
+    let mut request_value = json!({ "cancel_all": {} });
+    if let Some(coin) = &step.coin {
+        request_value["cancel_all"]["coin"] = json!(coin);
+    }
+
+    {
+        let mut artifacts = artifacts.lock().await;
+        let record = artifacts.make_action_record(
+            step_idx,
+            "cancel_all",
+            submit_ts,
+            request_value,
+            Some(ack_value),
+            observed.clone(),
+            Some("demo mode synthetic execution".to_string()),
+        );
+        artifacts.log_action(&record)?;
+        if let Some(Value::Array(events)) = &observed {
+            for event in events {
+                artifacts.log_ws_event(event)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+async fn run_demo_usd_transfer(
+    step_idx: usize,
+    step: &UsdClassTransferStep,
+    artifacts: &Arc<Mutex<RunArtifacts>>,
+) -> Result<()> {
+    let submit_ts = timestamp_ms();
+    let ack_value = json!({ "status": "ok" });
+    let observed = json!({
+        "channel": "userNonFundingLedgerUpdates",
+        "coin": "USDC",
+        "change": if step.to_perp { -step.usdc } else { step.usdc },
+        "toPerp": step.to_perp,
+        "demo": true
+    });
+
+    let request_value = json!({
+        "usd_class_transfer": {
+            "toPerp": step.to_perp,
+            "usdc": step.usdc,
+        }
+    });
+
+    {
+        let mut artifacts = artifacts.lock().await;
+        let record = artifacts.make_action_record(
+            step_idx,
+            "usd_class_transfer",
+            submit_ts,
+            request_value,
+            Some(ack_value),
+            Some(Value::Array(vec![observed.clone()])),
+            Some("demo mode synthetic execution".to_string()),
+        );
+        artifacts.log_action(&record)?;
+        artifacts.log_ws_event(&observed)?;
+    }
+
+    Ok(())
+}
+
+async fn run_demo_set_leverage(
+    step_idx: usize,
+    step: &SetLeverageStep,
+    artifacts: &Arc<Mutex<RunArtifacts>>,
+) -> Result<()> {
+    let submit_ts = timestamp_ms();
+    let ack_value = json!({ "status": "ok" });
+    let observed = json!({
+        "channel": "setLeverage",
+        "coin": step.coin,
+        "leverage": step.leverage,
+        "cross": step.cross,
+        "demo": true
+    });
+
+    let request_value = json!({
+        "set_leverage": {
+            "coin": step.coin,
+            "leverage": step.leverage,
+            "cross": step.cross,
+        }
+    });
+
+    {
+        let mut artifacts = artifacts.lock().await;
+        let record = artifacts.make_action_record(
+            step_idx,
+            "set_leverage",
+            submit_ts,
+            request_value,
+            Some(ack_value),
+            Some(Value::Array(vec![observed.clone()])),
+            Some("demo mode synthetic execution".to_string()),
+        );
+        artifacts.log_action(&record)?;
+        artifacts.log_ws_event(&observed)?;
+    }
+
+    Ok(())
+}
+
+fn demo_mid_for_coin(coin: &str) -> f64 {
+    match coin {
+        "BTC" => 60_000.0,
+        "ETH" => 3_500.0,
+        "SOL" => 180.0,
+        "APT" => 10.0,
+        _ => 100.0,
+    }
 }
 
 fn spawn_ws_task(

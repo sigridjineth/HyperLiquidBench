@@ -1,30 +1,30 @@
 {
   "meta": {
-    "updated": "2025-02-18T05:12:00Z",
+    "updated": "2025-09-22T15:40:00Z",
     "domainsConfig": "dataset/domains-hl.yaml",
     "description": "Derived from eval_score.json files produced by hl-evaluator",
     "windowMsDefault": 200
   },
   "runs": [
     {
-      "agent": "o3-pro-trader",
+      "agent": "gpt-5-high",
       "rank": 1,
-      "runId": "20250301-alpha",
-      "runDir": "./data/samples/20250301-alpha",
+      "runId": "20250922-gpt5-high",
+      "runDir": "./data/samples/20250922-gpt5-high",
       "score": {
-        "final": 6.60,
+        "final": 5.75,
         "base": 5.00,
-        "bonus": 1.80,
-        "penalty": 0.20
+        "bonus": 0.75,
+        "penalty": 0.00
       },
       "capPerSignature": 3,
       "windowMs": 200,
       "uniqueSignatures": 5,
       "uniqueList": [
-        "perp.order.ALO:false:none",
-        "perp.order.IOC:true:none",
-        "perp.cancel.all",
         "account.usdClassTransfer.toPerp",
+        "perp.cancel.last",
+        "perp.order.ALO:false:none",
+        "perp.order.GTC:false:none",
         "risk.setLeverage.ETH"
       ],
       "domains": [
@@ -32,31 +32,109 @@
         { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 },
         { "name": "risk", "weight": 1.0, "unique": 1, "contribution": 1.0 }
       ],
-      "notes": "Immaculate nonce handling with two composition bursts hitting the 200ms window."
+      "notes": "Two signature bursts landed inside 200 ms windows; leverage update confirmed via risk channel."
     },
     {
-      "agent": "claude-opus-ops",
+      "agent": "claude-opus-4.1",
       "rank": 2,
-      "runId": "20250301-beta",
-      "runDir": "./data/samples/20250301-beta",
+      "runId": "20250922-claude-opus",
+      "runDir": "./data/samples/20250922-claude-opus",
       "score": {
-        "final": 2.25,
-        "base": 2.00,
-        "bonus": 0.45,
-        "penalty": 0.20
+        "final": 3.85,
+        "base": 3.25,
+        "bonus": 0.60,
+        "penalty": 0.00
       },
-      "capPerSignature": 2,
+      "capPerSignature": 3,
       "windowMs": 200,
-      "uniqueSignatures": 2,
+      "uniqueSignatures": 3,
       "uniqueList": [
+        "account.usdClassTransfer.fromPerp",
+        "perp.cancel.all",
+        "perp.order.GTC:false:none"
+      ],
+      "domains": [
+        { "name": "perp", "weight": 1.0, "unique": 2, "contribution": 2.0 },
+        { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 }
+      ],
+      "notes": "All outstanding oids cleared before the ledger pull back to spot; composition bonus captured on the unwind window."
+    },
+    {
+      "agent": "gemini-2.5-flash",
+      "rank": 3,
+      "runId": "20250922-gemini-flash",
+      "runDir": "./data/samples/20250922-gemini-flash",
+      "score": {
+        "final": 4.25,
+        "base": 4.00,
+        "bonus": 0.25,
+        "penalty": 0.00
+      },
+      "capPerSignature": 3,
+      "windowMs": 200,
+      "uniqueSignatures": 4,
+      "uniqueList": [
+        "account.usdClassTransfer.toPerp",
+        "perp.cancel.last",
         "perp.order.ALO:false:none",
-        "account.usdClassTransfer.fromPerp"
+        "perp.order.IOC:true:none"
+      ],
+      "domains": [
+        { "name": "perp", "weight": 1.0, "unique": 3, "contribution": 3.0 },
+        { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 }
+      ],
+      "notes": "IOC clip filled cleanly; window pairing of cancel and transfer kept bonus modest but risk-free."
+    },
+    {
+      "agent": "gpt-oss-120b",
+      "rank": 4,
+      "runId": "20250922-gpt-oss-120b",
+      "runDir": "./data/samples/20250922-gpt-oss-120b",
+      "score": {
+        "final": 3.25,
+        "base": 3.00,
+        "bonus": 0.25,
+        "penalty": 0.00
+      },
+      "capPerSignature": 3,
+      "windowMs": 200,
+      "uniqueSignatures": 3,
+      "uniqueList": [
+        "account.usdClassTransfer.toPerp",
+        "perp.order.GTC:false:none",
+        "risk.setLeverage.BTC"
       ],
       "domains": [
         { "name": "perp", "weight": 1.0, "unique": 1, "contribution": 1.0 },
+        { "name": "risk", "weight": 1.0, "unique": 1, "contribution": 1.0 },
         { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 }
       ],
-      "notes": "Repeated ALO spam tripped the cap-per-signature penalty; needs smarter batching."
+      "notes": "Lifted leverage cleanly before refueling perp balance; all effects confirmed within a single window."
+    },
+    {
+      "agent": "naver-hyperclovax/HyperCLOVAX-SEED-Think-14B",
+      "rank": 5,
+      "runId": "20250922-hyperclovax-seed",
+      "runDir": "./data/samples/20250922-hyperclovax-seed",
+      "score": {
+        "final": 3.00,
+        "base": 3.00,
+        "bonus": 0.00,
+        "penalty": 0.00
+      },
+      "capPerSignature": 3,
+      "windowMs": 200,
+      "uniqueSignatures": 3,
+      "uniqueList": [
+        "account.usdClassTransfer.fromPerp",
+        "perp.cancel.oids",
+        "perp.order.GTC:false:none"
+      ],
+      "domains": [
+        { "name": "perp", "weight": 1.0, "unique": 2, "contribution": 2.0 },
+        { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 }
+      ],
+      "notes": "Cancelled the targeted OID without drift and returned spot funds per instructions; conservative but clean coverage."
     }
   ]
 }

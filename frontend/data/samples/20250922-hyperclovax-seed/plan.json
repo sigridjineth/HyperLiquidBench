@@ -1,0 +1,23 @@
+{
+  "steps": [
+    {
+      "perp_orders": {
+        "builderCode": "hyperclovax-seed",
+        "orders": [
+          {
+            "coin": "ETH",
+            "tif": "Gtc",
+            "side": "sell",
+            "sz": 0.006,
+            "reduceOnly": false,
+            "px": "mid+0.5%",
+            "cloid": "a7c03f4b-2a1f-4a99-8728-7b0d4f1efb4d",
+            "trigger": { "kind": "none" }
+          }
+        ]
+      }
+    },
+    { "cancel_oids": { "coin": "ETH", "oids": [100378945] } },
+    { "usd_class_transfer": { "toPerp": false, "usdc": 5.0 } }
+  ]
+}

@@ -1,0 +1,6 @@
+{"stepIdx":0,"action":"perp_orders","submitTsMs":1730399000000,"windowKeyMs":1730399000000,"signatures":["perp.order.ALO:false:none"],"ignored":false,"reason":null}
+{"stepIdx":1,"action":"perp_orders","submitTsMs":1730399000120,"windowKeyMs":1730399000000,"signatures":["perp.order.ALO:false:none"],"ignored":false,"reason":null}
+{"stepIdx":2,"action":"perp_orders","submitTsMs":1730399000300,"windowKeyMs":1730399000200,"signatures":["perp.order.ALO:false:none"],"ignored":false,"reason":null}
+{"stepIdx":3,"action":"usd_class_transfer","submitTsMs":1730399000440,"windowKeyMs":1730399000400,"signatures":["account.usdClassTransfer.fromPerp"],"ignored":false,"reason":null}
+{"stepIdx":4,"action":"perp_orders","submitTsMs":1730399000600,"windowKeyMs":1730399000600,"signatures":["perp.order.ALO:false:none"],"ignored":false,"reason":null}
+{"stepIdx":5,"action":"perp_orders","submitTsMs":1730399000720,"windowKeyMs":1730399000600,"signatures":[],"ignored":true,"reason":"AckNotOk"}

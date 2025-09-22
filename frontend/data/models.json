@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "updated": "2025-02-18T05:12:00Z",
+    "domainsConfig": "dataset/domains-hl.yaml",
+    "description": "Derived from eval_score.json files produced by hl-evaluator",
+    "windowMsDefault": 200
+  },
+  "runs": [
+    {
+      "agent": "o3-pro-trader",
+      "rank": 1,
+      "runId": "20250301-alpha",
+      "runDir": "./data/samples/20250301-alpha",
+      "score": {
+        "final": 6.60,
+        "base": 5.00,
+        "bonus": 1.80,
+        "penalty": 0.20
+      },
+      "capPerSignature": 3,
+      "windowMs": 200,
+      "uniqueSignatures": 5,
+      "uniqueList": [
+        "perp.order.ALO:false:none",
+        "perp.order.IOC:true:none",
+        "perp.cancel.all",
+        "account.usdClassTransfer.toPerp",
+        "risk.setLeverage.ETH"
+      ],
+      "domains": [
+        { "name": "perp", "weight": 1.0, "unique": 3, "contribution": 3.0 },
+        { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 },
+        { "name": "risk", "weight": 1.0, "unique": 1, "contribution": 1.0 }
+      ],
+      "notes": "Immaculate nonce handling with two composition bursts hitting the 200ms window."
+    },
+    {
+      "agent": "claude-opus-ops",
+      "rank": 2,
+      "runId": "20250301-beta",
+      "runDir": "./data/samples/20250301-beta",
+      "score": {
+        "final": 2.25,
+        "base": 2.00,
+        "bonus": 0.45,
+        "penalty": 0.20
+      },
+      "capPerSignature": 2,
+      "windowMs": 200,
+      "uniqueSignatures": 2,
+      "uniqueList": [
+        "perp.order.ALO:false:none",
+        "account.usdClassTransfer.fromPerp"
+      ],
+      "domains": [
+        { "name": "perp", "weight": 1.0, "unique": 1, "contribution": 1.0 },
+        { "name": "account", "weight": 1.0, "unique": 1, "contribution": 1.0 }
+      ],
+      "notes": "Repeated ALO spam tripped the cap-per-signature penalty; needs smarter batching."
+    }
+  ]
+}

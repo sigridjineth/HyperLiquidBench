@@ -1,0 +1,8 @@
+{
+  "benchVersion": "0.3.2",
+  "runner": "hl-runner",
+  "domainsConfig": "../../dataset/domains-hl.yaml",
+  "windowMs": 200,
+  "plan": "low-latency-warmup",
+  "builderCode": "HLB-004"
+}

@@ -180,6 +180,11 @@ async fn main() -> Result<()> {
     )
     .await?;
 
+    let window_ms = {
+        let artifacts = artifacts.lock().await;
+        artifacts.window_ms()
+    };
+
     let meta = json!({
         "network": cli.network.as_str(),
         "builderCode": cli.builder_code,
@@ -188,6 +193,7 @@ async fn main() -> Result<()> {
         "outDir": out_dir.display().to_string(),
         "effectTimeoutMs": cli.effect_timeout_ms,
         "timestamp": timestamp,
+        "windowMs": window_ms,
     });
     artifacts.lock().await.write_meta(&meta)?;
 

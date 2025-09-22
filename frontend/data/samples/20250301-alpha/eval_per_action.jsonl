@@ -1,0 +1,6 @@
+{"stepIdx":0,"action":"perp_orders","submitTsMs":1730400000000,"windowKeyMs":1730400000000,"signatures":["perp.order.ALO:false:none"],"ignored":false,"reason":null}
+{"stepIdx":1,"action":"perp_orders","submitTsMs":1730400000125,"windowKeyMs":1730400000000,"signatures":["perp.order.IOC:true:none"],"ignored":false,"reason":null}
+{"stepIdx":2,"action":"cancel_all","submitTsMs":1730400000300,"windowKeyMs":1730400000200,"signatures":["perp.cancel.all"],"ignored":false,"reason":null}
+{"stepIdx":3,"action":"usd_class_transfer","submitTsMs":1730400000410,"windowKeyMs":1730400000400,"signatures":["account.usdClassTransfer.toPerp"],"ignored":false,"reason":null}
+{"stepIdx":4,"action":"set_leverage","submitTsMs":1730400000550,"windowKeyMs":1730400000400,"signatures":["risk.setLeverage.ETH"],"ignored":false,"reason":null}
+{"stepIdx":5,"action":"perp_orders","submitTsMs":1730400000720,"windowKeyMs":1730400000600,"signatures":[],"ignored":true,"reason":"AckNotOk"}

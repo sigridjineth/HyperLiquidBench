@@ -1,0 +1,104 @@
+{
+  "site": {
+    "title": "HyperLiquidBench",
+    "nav": {
+      "home": "Overview",
+      "trajectories": "Action Logs",
+      "breakdown": "Domain Breakdown"
+    }
+  },
+  "home": {
+    "hero": {
+      "title": "Operational benchmark for Hyperliquid agents",
+      "subtitle": "Weekly coverage runs that verify nonce discipline, flag-aware order routing, and balance controls directly against Hyperliquid's live APIs. Scores come from eval_score.json snapshots produced by hl-evaluator using domains-hl.yaml.",
+      "pillars": [
+        {
+          "title": "Signature coverage",
+          "text": "Unique Hyperliquid operation signatures executed within the weighted domain policy (perp, account, risk)."
+        },
+        {
+          "title": "Composition bonus",
+          "text": "Rewards agents that safely chain actions inside Hyperliquid's 200 ms nonce window without conflicts."
+        },
+        {
+          "title": "Penalty avoidance",
+          "text": "Highlights repeated signatures beyond the per-signature cap so you can spot sloppy batching or retry storms."
+        }
+      ]
+    },
+    "scoreboard": {
+      "title": "Latest operator leaderboard",
+      "source": "Policy & references:",
+      "link_text": "Inspect action logs",
+      "link_href": "./trajectories.html"
+    },
+    "charts": {
+      "final": "Final vs base score",
+      "bonus": "Composition bonus"
+    },
+    "howto": {
+      "title": "Refresh the public snapshot",
+      "steps": [
+        "Run hl-runner to collect per_action.jsonl, ws_stream.jsonl, and run_meta.json under runs/<timestamp>.",
+        "Evaluate with hl-evaluator --domains dataset/domains-hl.yaml to produce eval_per_action.jsonl, eval_score.json, unique_signatures.json.",
+        "Copy the new run folder into frontend/data/samples/<timestamp> and append a record to data/models.json.",
+        "Deploy the static frontend to Vercel, Cloudflare Pages, or GitHub Pages."
+      ],
+      "footnote": "Scores shown here were exported from eval_score.json snapshots on 2025-02-18."
+    },
+    "footer": "HyperLiquidBench — Operational competence > raw PnL"
+  },
+  "trajectories": {
+    "title": "Action Log Explorer",
+    "subtitle": "Select a leaderboard run or upload your own hl-evaluator output to inspect per-action signatures, windows, and reasons for ignored steps.",
+    "uploader": {
+      "sample_btn": "Load selected run",
+      "or": "or",
+      "pick_label": "Upload run folder",
+      "note": "Required files: eval_per_action.jsonl, per_action.jsonl (optional: eval_score.json, run_meta.json)",
+      "select_label": "Leaderboard run"
+    },
+    "detail_title": "Action detail",
+    "close": "Close",
+    "errors": {
+      "missing_files": "The folder must contain eval_per_action.jsonl and per_action.jsonl."
+    }
+  },
+  "breakdown": {
+    "title": "Domain & signature breakdown",
+    "subtitle": "Per-domain coverage, composition bonus, and penalty accents for each agent run.",
+    "datasets": {
+      "policy": {
+        "label": "Domain policy",
+        "cta": "Open domains-hl.yaml",
+        "description": "Pattern weights for perp, account, and risk signatures."
+      },
+      "signatures": {
+        "label": "Unique signatures",
+        "cta": "View signature manifest",
+        "description": "Sorted list emitted by hl-evaluator (unique_signatures.json)."
+      }
+    },
+    "table": {
+      "caption": "Operational breakdown",
+      "cols": {
+        "rank": "Rank",
+        "agent": "Agent",
+        "final": "Final",
+        "base": "Base",
+        "bonus": "Bonus",
+        "penalty": "Penalty",
+        "unique": "Unique sigs",
+        "domains": "Domain spread"
+      }
+    },
+    "notes": {
+      "title": "Observations",
+      "items": [
+        "Final score = base + bonus − penalty. Bonus reflects windows that include multiple effectful signatures within 200 ms.",
+        "Penalties flag repeated signatures beyond the cap_per_signature chosen for the run.",
+        "Inspect unique_signatures.json to validate the exact operations an agent executed."
+      ]
+    }
+  }
+}

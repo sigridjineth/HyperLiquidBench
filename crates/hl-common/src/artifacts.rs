@@ -186,3 +186,11 @@ impl RunArtifacts {
         }
     }
 }
+
+impl Drop for RunArtifacts {
+    fn drop(&mut self) {
+        let _ = self.per_action.flush();
+        let _ = self.ws_stream.flush();
+        let _ = self.routed_csv.flush();
+    }
+}

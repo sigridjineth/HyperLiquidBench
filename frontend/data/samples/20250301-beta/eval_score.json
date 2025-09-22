@@ -1,0 +1,32 @@
+{
+  "finalScore": 2.25,
+  "base": 2.00,
+  "bonus": 0.45,
+  "penalty": 0.20,
+  "perDomain": [
+    {
+      "name": "perp",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "perp.order.ALO:false:none"
+      ],
+      "uniqueCount": 1,
+      "contribution": 1.0
+    },
+    {
+      "name": "account",
+      "weight": 1.0,
+      "uniqueSignatures": [
+        "account.usdClassTransfer.fromPerp"
+      ],
+      "uniqueCount": 1,
+      "contribution": 1.0
+    }
+  ],
+  "uniqueSignatures": [
+    "perp.order.ALO:false:none",
+    "account.usdClassTransfer.fromPerp"
+  ],
+  "capPerSignature": 2,
+  "windowMs": 200
+}

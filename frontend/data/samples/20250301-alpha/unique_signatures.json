@@ -1,0 +1,7 @@
+[
+  "perp.order.ALO:false:none",
+  "perp.order.IOC:true:none",
+  "perp.cancel.all",
+  "account.usdClassTransfer.toPerp",
+  "risk.setLeverage.ETH"
+]

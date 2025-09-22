@@ -5,14 +5,14 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::time::window_start_ms;
 
 const DEFAULT_WINDOW_MS: i64 = 200;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionLogRecord {
     pub step_idx: usize,

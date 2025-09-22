@@ -703,6 +703,8 @@ async fn execute_perp_orders(
         .or(default_builder)
         .map(|code| code.to_string());
 
+    let mut receiver = broadcaster.subscribe();
+
     let response = match (builder_code.clone(), client_orders) {
         (Some(code), orders) => {
             let builder = BuilderInfo {
@@ -765,7 +767,6 @@ async fn execute_perp_orders(
     let mut observed_events = Vec::new();
     let mut missing = Vec::new();
     if !ack_oids.is_empty() {
-        let mut receiver = broadcaster.subscribe();
         for maybe_oid in per_order_oid.iter().flatten() {
             let wait = Duration::from_millis(effect_timeout_ms);
             match wait_for_order_event(&mut receiver, *maybe_oid, wait).await {
@@ -801,6 +802,7 @@ async fn execute_perp_orders(
                 "builderCode": order.builder_code,
                 "px": order_price_label(&order.px),
                 "resolvedPx": limit_px,
+                "trigger": "none",
             })
         })
         .collect();
@@ -857,6 +859,7 @@ async fn execute_cancel_last(
     let mut ack_value = json!({ "status": "skipped" });
 
     if let Some(target_order) = target {
+        let mut receiver = broadcaster.subscribe();
         let request = ClientCancelRequest {
             asset: target_order.coin.clone(),
             oid: target_order.oid,
@@ -869,7 +872,6 @@ async fn execute_cancel_last(
         if matches!(response, ExchangeResponseStatus::Ok(_)) {
             placed_orders.retain(|order| order.oid != target_order.oid);
 
-            let mut receiver = broadcaster.subscribe();
             let wait = Duration::from_millis(effect_timeout_ms);
             if let Some(event) = wait_for_order_event(&mut receiver, target_order.oid, wait).await {
                 observed_value = Some(event.payload().clone());
@@ -924,6 +926,7 @@ async fn execute_cancel_oids(
     }
 
     let submit_ts = timestamp_ms();
+    let mut receiver = broadcaster.subscribe();
     let cancels: Vec<ClientCancelRequest> = step
         .oids
         .iter()
@@ -945,7 +948,6 @@ async fn execute_cancel_oids(
 
         let mut observed = Vec::new();
         let mut missing = Vec::new();
-        let mut receiver = broadcaster.subscribe();
         let wait = Duration::from_millis(effect_timeout_ms);
         for oid in &step.oids {
             match wait_for_order_event(&mut receiver, *oid, wait).await {
@@ -1019,6 +1021,7 @@ async fn execute_cancel_all(
     if targets.is_empty() {
         notes = Some("no orders to cancel".to_string());
     } else {
+        let mut receiver = broadcaster.subscribe();
         let cancels: Vec<ClientCancelRequest> = targets
             .iter()
             .map(|order| ClientCancelRequest {
@@ -1036,7 +1039,6 @@ async fn execute_cancel_all(
             let oids: Vec<u64> = targets.iter().map(|order| order.oid).collect();
             remove_tracked_oids(placed_orders, &oids);
 
-            let mut receiver = broadcaster.subscribe();
             let wait = Duration::from_millis(effect_timeout_ms);
             let mut observed = Vec::new();
             let mut missing = Vec::new();
@@ -1092,13 +1094,13 @@ async fn execute_class_transfer(
     effect_timeout_ms: u64,
 ) -> Result<()> {
     let submit_ts = timestamp_ms();
+    let mut receiver = broadcaster.subscribe();
     let response = exchange
         .class_transfer(step.usdc, step.to_perp, None)
         .await
         .context("failed to submit class transfer")?;
     let ack_value = exchange_status_json(&response);
 
-    let mut receiver = broadcaster.subscribe();
     let wait = Duration::from_millis(effect_timeout_ms);
     let (observed_value, notes) = if matches!(response, ExchangeResponseStatus::Ok(_)) {
         let observed = wait_for_ledger_event(&mut receiver, step.to_perp, wait).await;

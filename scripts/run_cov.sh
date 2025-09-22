@@ -23,9 +23,20 @@ fi
 
 OUT_DIR=${OUT_DIR:-"runs/$(date +%Y%m%d-%H%M%S)"}
 NETWORK=${NETWORK:-testnet}
+DOMAINS_FILE=${DOMAINS_FILE:-dataset/domains-hl.yaml}
+EVAL_ARGS=${EVAL_ARGS:-}
 
 cargo run -p hl-runner -- \
   --plan "$PLAN_SPEC" \
   --out "$OUT_DIR" \
   --network "$NETWORK" \
   "$@"
+
+cargo run -p hl-evaluator -- \
+  --input "$OUT_DIR/per_action.jsonl" \
+  --domains "$DOMAINS_FILE" \
+  --out-dir "$OUT_DIR" \
+  $EVAL_ARGS
+
+echo "final score written to $OUT_DIR/eval_score.json"
+cat "$OUT_DIR/eval_score.json"

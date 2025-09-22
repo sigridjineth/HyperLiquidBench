@@ -107,6 +107,57 @@ environment variables via `dotenvy`).
 
 ### 2. Execute the plan with the runner
 
+#### Option A – Demo mode (no network, no key)
+
+Use this to validate the full pipeline or populate the frontend without touching live endpoints. The runner synthesizes acknowledgements and websocket effects while preserving the artifact schema expected by the evaluator and UI.
+
+```bash
+cargo run -p hl-runner --release -- \
+  --demo \
+  --plan dataset/tasks/hl_perp_basic_01.jsonl:1 \
+  --out runs/demo
+
+cargo run -p hl-evaluator --release -- \
+  --input runs/demo/per_action.jsonl \
+  --domains dataset/domains-hl.yaml \
+  --out-dir runs/demo
+```
+
+Artifacts match the live format but `run_meta.json` includes `"demoMode": true` and synthetic websocket frames include `"demo": true` so you can flag mock data downstream.
+
+##### (Optional) Demo + LLM plan generation
+
+You can still exercise the LLM pipeline in demo mode. That lets you validate prompts, caching, and plan decoding without hitting the exchange.
+
+1. **Set credentials** (only the OpenRouter key is required in demo mode):
+   ```bash
+   export OPENROUTER_API_KEY=sk-or-...
+   export LLM_MODEL="google/gemini-2.5-pro"   # or any OpenRouter model you have access to
+   export HL_LLM_DRYRUN=1                     # skip on-venue execution entirely
+   ```
+2. **Generate a coverage plan via LLM**:
+   ```bash
+   cargo run -p hl-runner -- \
+     --plan llm:coverage \
+     --demo \
+     --llm-max-steps 3 \
+     --llm-allowed-coins BTC,ETH \
+     --llm-builder-code demo-builder
+   ```
+   The runner writes `plan.json` and `plan_raw.txt` using the LLM response, but no network calls are made because both `--demo` and `HL_LLM_DRYRUN=1` are active.
+3. **Inspect and (optionally) score**:
+   ```bash
+   RUN_DIR=$(ls -dt runs/* | head -n1)
+   cargo run -p hl-evaluator -- \
+     --input "$RUN_DIR/per_action.jsonl" \
+     --domains dataset/domains-hl.yaml \
+     --out-dir "$RUN_DIR"
+   ```
+
+`run_meta.json` records the LLM metadata (`model`, `temperature`, `prompt_hash`, cache hits) alongside the standard demo flags, giving you a reproducible artifact for each prompt test.
+
+#### Option B – Live network execution
+
 ```bash
 cargo run -p hl-runner -- \
   --plan dataset/tasks/hl_perp_basic_01.jsonl:1 \
@@ -114,14 +165,11 @@ cargo run -p hl-runner -- \
   --builder-code "$HL_BUILDER_CODE"
 ```
 
-- The `:<N>` suffix selects a specific JSONL line (1-based). You can point to a
-  plain JSON plan without the suffix.
-- `--network` accepts `testnet`, `mainnet`, or `local` and maps to Hyperliquid
-  base URLs.
+- The `:<N>` suffix selects a specific JSONL line (1-based). You can point to a plain JSON plan without the suffix.
+- `--network` accepts `testnet`, `mainnet`, or `local` and maps to Hyperliquid base URLs.
 - Useful environment overrides:
   - `OUT_DIR` – force the output directory (defaults to `runs/<timestamp>`).
-  - `HL_EFFECT_TIMEOUT_MS` – overrides `--effect-timeout-ms` used when waiting
-    for websocket confirmations.
+  - `HL_EFFECT_TIMEOUT_MS` – overrides `--effect-timeout-ms` used when waiting for websocket confirmations.
 - Artifacts written (see `docs/PLAN_3_1.md`):
   - `per_action.jsonl` – per step: request, ack, observed events, notes, window key.
   - `ws_stream.jsonl` – raw websocket frames (order updates, fills, ledger updates).
@@ -129,11 +177,15 @@ cargo run -p hl-runner -- \
   - `run_meta.json` – metadata (network, wallet, builder code, effect timeout).
   - `plan.json` / `plan_raw.txt` – executed plan (pretty + raw).
 
-`scripts/run_cov.sh` wraps the two-step process (runner + evaluator) and accepts
-the same options. Example:
+`scripts/run_cov.sh` wraps the two-step process (runner + evaluator) and accepts the same options. For demo runs omit `NETWORK` (or set it to `demo`) and forward `--demo` after the `--` separator:
+
 ```bash
-OUT_DIR=runs/demo NETWORK=testnet \
-  scripts/run_cov.sh dataset/tasks/hl_cancel_sweep_01.jsonl:1 -- --builder-code "$HL_BUILDER_CODE"
+OUT_DIR=runs/demo scripts/run_cov.sh dataset/tasks/hl_cancel_sweep_01.jsonl:1 -- \
+  --demo --builder-code "demo-builder"
+
+OUT_DIR=runs/testnet NETWORK=testnet \
+  scripts/run_cov.sh dataset/tasks/hl_cancel_sweep_01.jsonl:1 -- \
+  --builder-code "$HL_BUILDER_CODE"
 ```
 
 ### 3. Score the run with the evaluator
